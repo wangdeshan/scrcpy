@@ -113,6 +113,9 @@ const struct scrcpy_options scrcpy_options_default = {
     .angle = NULL,
     .vd_destroy_content = true,
     .vd_system_decorations = true,
+    // 录制分段参数变量Start
+    .record_segment_time = 0,
+    // 录制分段参数变量End
 };
 
 enum sc_orientation

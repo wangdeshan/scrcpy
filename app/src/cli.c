@@ -114,6 +114,7 @@ enum {
     OPT_NO_VD_SYSTEM_DECORATIONS,
     OPT_NO_VD_DESTROY_CONTENT,
     OPT_DISPLAY_IME_POLICY,
+    OPT_RECORD_SEGMENT,
 };
 
 struct sc_option {
@@ -1063,6 +1064,14 @@ static const struct sc_option options[] = {
         .text = "Set the initial window height.\n"
                 "Default is 0 (automatic).",
     },
+    // 录制分段参数定义Start
+	{
+        .longopt_id = OPT_RECORD_SEGMENT,
+		.longopt = "record-segment",
+		.argdesc = "seconds",
+		.text = "OPT_RECORD_SEGMENT",
+	}
+    // 录制分段参数定义End
 };
 
 static const struct sc_shortcut shortcuts[] = {
@@ -1601,6 +1610,20 @@ parse_bit_rate(const char *s, uint32_t *bit_rate) {
     }
 
     *bit_rate = (uint32_t) value;
+    return true;
+}
+
+static bool
+parse_segment_time(const char *s, uint32_t *segment_time) {
+    long value;
+    // long may be 32 bits (it is the case on mingw), so do not use more than
+    // 31 bits (long is signed)
+    bool ok = parse_integer_arg(s, &value, true, 0, 0x7FFFFFFF, "segment_time");
+    if (!ok) {
+        return false;
+    }
+
+    *segment_time = (uint32_t) value;
     return true;
 }
 
@@ -2374,6 +2397,11 @@ parse_args_with_getopt(struct scrcpy_cli_args *args, int argc, char *argv[],
                 break;
             case OPT_AUDIO_BIT_RATE:
                 if (!parse_bit_rate(optarg, &opts->audio_bit_rate)) {
+                    return false;
+                }
+                break;
+            case OPT_RECORD_SEGMENT:
+                if (!parse_segment_time(optarg, &opts->record_segment_time)) {
                     return false;
                 }
                 break;

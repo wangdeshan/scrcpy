@@ -5,6 +5,7 @@ import com.genymobile.scrcpy.util.Ln;
 import com.genymobile.scrcpy.util.Settings;
 import com.genymobile.scrcpy.util.SettingsException;
 import com.genymobile.scrcpy.wrappers.ServiceManager;
+import com.genymobile.scrcpy.util.Brightness;
 
 import android.os.BatteryManager;
 import android.os.Looper;
@@ -264,6 +265,7 @@ public final class CleanUp {
                 Ln.i("Restoring display power");
                 Device.setDisplayPower(targetDisplayId, true);
             }
+            Brightness.Tick();
         }
 
         System.exit(0);

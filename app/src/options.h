@@ -327,6 +327,9 @@ struct scrcpy_options {
     const char *start_app;
     bool vd_destroy_content;
     bool vd_system_decorations;
+    // 录制分段参数变量Start
+    uint32_t record_segment_time;
+    // 录制分段参数变量End
 };
 
 extern const struct scrcpy_options scrcpy_options_default;

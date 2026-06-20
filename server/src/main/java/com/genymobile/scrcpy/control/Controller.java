@@ -18,6 +18,7 @@ import com.genymobile.scrcpy.wrappers.ClipboardManager;
 import com.genymobile.scrcpy.wrappers.InputManager;
 import com.genymobile.scrcpy.wrappers.ServiceManager;
 
+import com.genymobile.scrcpy.util.Brightness;
 import android.content.Intent;
 import android.os.Build;
 import android.os.SystemClock;
@@ -740,6 +741,9 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         if (setDisplayPowerOk) {
             // Do not keep display power off for virtual displays: MOD+p must wake up the physical device
             keepDisplayPowerOff = displayId != Device.DISPLAY_ID_NONE && !on;
+            if (on){
+                Brightness.Tick();
+            }
             Ln.i("Device display turned " + (on ? "on" : "off"));
             if (cleanUp != null) {
                 boolean mustRestoreOnExit = !on;

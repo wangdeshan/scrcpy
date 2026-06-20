@@ -38,6 +38,7 @@ struct sc_recorder {
     enum sc_orientation orientation;
 
     char *filename;
+    char *filenameorig;
     enum sc_record_format format;
     AVFormatContext *ctx;
 
@@ -60,6 +61,18 @@ struct sc_recorder {
 
     const struct sc_recorder_callbacks *cbs;
     void *cbs_userdata;
+
+    // 录制分段Start
+    uint64_t segment_duration_us;
+    uint64_t segment_start_pts;
+    uint64_t segment_start_dts;
+    unsigned segment_index;
+	bool av_cfgpkt_init;
+	AVPacket *video_cfg_pkt;
+	AVPacket *audio_cfg_pkt;
+	AVCodecContext *video_codec_ctx;
+	AVCodecContext *audio_codec_ctx;
+    // 录制分段End
 };
 
 struct sc_recorder_callbacks {
@@ -85,4 +98,6 @@ sc_recorder_join(struct sc_recorder *recorder);
 void
 sc_recorder_destroy(struct sc_recorder *recorder);
 
+static bool
+recorder_rotate_file(struct sc_recorder *recorder);
 #endif
