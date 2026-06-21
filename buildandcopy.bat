@@ -3,30 +3,36 @@ cd /d %~dp0
 @chcp 65001
 :ST
 @echo.
-@echo 1. Copy
-@echo 2. Build
-@echo 3. TestRun
+@echo 1. Build
+@echo 2. TestRun
+@echo 3. CopyBin
+@echo 9. Exit
 @echo.
-@choice /c:123 /n /m ">"
+@choice /c:1239 /n /m ">"
 @set SELECTED=%errorlevel%
 @CLS
-@if "%SELECTED%" equ "1" @CALL :COPYBIN
+@if "%SELECTED%" equ "1" @CALL :BUILD
 @if "%SELECTED%" equ "2" @CALL :BUILD
-@if "%SELECTED%" equ "3" @CALL :TESTRUN
+@if "%SELECTED%" equ "3" @CALL :BUILD
+@if "%SELECTED%" equ "4" @exit /b
 @goto :ST
 
 
 :BUILD
 @REM ADB
 @REM wsl app/deps/adb_windows.sh
-@REM call gradlew  assembledebug
+@REM @chcp 936
+@REM @call gradlew  assembledebug
 
 @REM @CALL :BUILDTEST
-@CALL :BUILDMAIN win32 cross static release
+@REM @CALL :BUILDMAIN win32 cross static release
+@REM @CALL :BUILDMAIN win32 cross shared release
 @REM @CALL :BUILDMAIN win32 cross static debug
-@REM @CALL :BUILDMAIN win32 cross shared
-@REM @CALL :BUILDMAIN win64 cross static
-@REM @CALL :BUILDMAIN win64 cross shared
+@REM @CALL :BUILDMAIN win32 cross shared debug
+@CALL :BUILDMAIN win64 cross static release
+@REM @CALL :BUILDMAIN win64 cross shared release
+@REM @CALL :BUILDMAIN win64 cross static debug
+@REM @CALL :BUILDMAIN win64 cross shared debug
 @GOTO :END
 
 :BUILDTEST
@@ -50,13 +56,18 @@ wsl ninja -C "%TEST_DIR%" test
 @ECHO.
 @for /F %%i in ('git rev-parse --short HEAD') do ( @set COMMIT=%%i)
 
-@ECHO.BUILD %TARGET_HOST%-%BUILD_TYPE%-%LINK_TYPE%-%COMMIT%-%DEBUG_TYPE%
 
-@SET "BUILD_DIR=build/%TARGET_HOST%-%BUILD_TYPE%-%LINK_TYPE%-%COMMIT%-%DEBUG_TYPE%"
+@SET "BP=%TARGET_HOST%-%BUILD_TYPE%-%LINK_TYPE%-%COMMIT%-%DEBUG_TYPE%"
+@ECHO.BUILD %BP%
+
+@SET "BUILD_DIR=build/%BP%"
 @SET "DEPDIR=app/deps/work/install/%TARGET_HOST%-%BUILD_TYPE%-%LINK_TYPE%/"
 
+@if "%SELECTED%" equ "2" @GOTO :TESTRUN
+@if "%SELECTED%" equ "3" @GOTO :COPYBIN
+
 @REM wsl app/deps/sdl.sh    %TARGET_HOST% %BUILD_TYPE% %LINK_TYPE%
-@REM wsl app/deps/dav1d.sh %TARGET_HOST% %BUILD_TYPE% %LINK_TYPE%
+@REM wsl app/deps/dav1d.sh  %TARGET_HOST% %BUILD_TYPE% %LINK_TYPE%
 @REM wsl app/deps/ffmpeg.sh %TARGET_HOST% %BUILD_TYPE% %LINK_TYPE%
 @REM wsl app/deps/libusb.sh %TARGET_HOST% %BUILD_TYPE% %LINK_TYPE%
 @REM @GOTO :END
@@ -81,18 +92,18 @@ wsl ninja -C "%TEST_DIR%" test
 :COPYBIN
 @cls
 @taskkill /f /im scrcpy.exe
-@copy build\win32-cross-static-a34d9145-release\app\scrcpy.exe ..\scrcpy-dev\scrcpy.exe  /Y /B
+@copy build\%BP%\app\scrcpy.exe ..\scrcpy-dev\scrcpy.exe  /Y /B
 @GOTO :END
 
 :TESTRUN
 @cls
 @SET OLDCWD=%CD%
-@cd build/win32-cross-static-a34d9145-release\app
+@cd "build\%BP%\app"
 @SET "SCRCPY_SERVER_PATH=..\..\..\server\build\outputs\apk\debug\server-debug.apk"
-@del r:\Logs\ScreenRecoder[*].mp4
-@del r:\Logs\ScreenRecoder[*].mkv
+@del r:\Logs\ScreenRecoder\[*].mp4
+@del r:\Logs\ScreenRecoder\[*].mkv
 @scrcpy --list-display
-@scrcpy --record-segment=30 --record=r:\Logs\ScreenRecoder[%%03d].mp4 -m 640 --display-id=0
+@scrcpy --record-segment=30 --record=r:\Logs\ScreenRecoder\[%%03d].mp4 -m 640 --display-id=0
 @cd %OLDCWD%
 @GOTO :END
 

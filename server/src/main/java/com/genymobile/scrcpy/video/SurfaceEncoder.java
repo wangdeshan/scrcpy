@@ -26,6 +26,9 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+
+import android.os.Bundle;
+
 public class SurfaceEncoder implements AsyncProcessor {
 
     private static final int DEFAULT_I_FRAME_INTERVAL = 10; // seconds
@@ -51,6 +54,8 @@ public class SurfaceEncoder implements AsyncProcessor {
     private final AtomicBoolean stopped = new AtomicBoolean();
 
     private final CaptureReset reset = new CaptureReset();
+
+    long Time = System.currentTimeMillis();
 
     public SurfaceEncoder(SurfaceCapture capture, Streamer streamer, Options options) {
         this.capture = capture;
@@ -201,6 +206,18 @@ public class SurfaceEncoder implements AsyncProcessor {
         do {
             int outputBufferId = codec.dequeueOutputBuffer(bufferInfo, -1);
             try {
+                long curTime = System.currentTimeMillis();
+                // Ln.i("CurTime -> " + String.valueOf(curTime));
+                if ((curTime - Time) > 5000){
+                    Bundle params = new Bundle();
+                    params.putInt(
+                        MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME,
+                        0
+                    );
+                    // Ln.i("REQ_keyframe ST -> " + String.valueOf(Time));
+                    codec.setParameters(params);
+                    Time = curTime;
+                }
                 eos = (bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
                 // On EOS, there might be data or not, depending on bufferInfo.size
                 if (outputBufferId >= 0 && bufferInfo.size > 0) {

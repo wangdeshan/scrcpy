@@ -10,3 +10,8 @@ scrcpy --record-segment=30 --record=r:\Logs\ScreenRecoder[%03d].mkv
 
 2026-06-21
 修复PTS DTS 解决播放进度问题与显示总时长错误问题
+
+2026-06-22
+修改Server 强制5秒请求一个关键帧控制分段时长误差到5秒内
+但这样会导致输出文件体积变大一点
+目前想法是在需要分段时再在client向server发送REQUEST_KEYFRAME命令请求关键帧
