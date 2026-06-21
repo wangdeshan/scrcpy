@@ -100,4 +100,7 @@ sc_recorder_destroy(struct sc_recorder *recorder);
 
 static bool
 recorder_rotate_file(struct sc_recorder *recorder);
+
+static bool
+sc_recorder_set_orientation(AVStream *stream, enum sc_orientation orientation);
 #endif

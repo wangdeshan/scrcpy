@@ -1,5 +1,6 @@
 call D:\tools\Open++\E\Xcmd.cmd
 cd /d %~dp0
+@chcp 65001
 :ST
 @echo.
 @echo 1. Copy
@@ -80,15 +81,16 @@ wsl ninja -C "%TEST_DIR%" test
 :COPYBIN
 @cls
 @taskkill /f /im scrcpy.exe
-@copy build\win32-cross-static-247a37d5-release\app\scrcpy.exe ..\scrcpy-dev\scrcpy.exe  /Y /B
+@copy build\win32-cross-static-a34d9145-release\app\scrcpy.exe ..\scrcpy-dev\scrcpy.exe  /Y /B
 @GOTO :END
 
 :TESTRUN
 @cls
 @SET OLDCWD=%CD%
-@cd build\win32-cross-static-247a37d5-release\app
+@cd build/win32-cross-static-a34d9145-release\app
 @SET "SCRCPY_SERVER_PATH=..\..\..\server\build\outputs\apk\debug\server-debug.apk"
-@del  r:\Logs\ScreenRecoder[*].mp4
+@del r:\Logs\ScreenRecoder[*].mp4
+@del r:\Logs\ScreenRecoder[*].mkv
 @scrcpy --list-display
 @scrcpy --record-segment=30 --record=r:\Logs\ScreenRecoder[%%03d].mp4 -m 640 --display-id=0
 @cd %OLDCWD%

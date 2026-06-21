@@ -107,13 +107,11 @@ static bool
 sc_recorder_write_stream(struct sc_recorder *recorder,
                          struct sc_recorder_stream *st, AVPacket *packet) {
     AVStream *stream = recorder->ctx->streams[st->index];
-	
     sc_recorder_rescale_packet(stream, packet);
-	
     if (st->last_pts != AV_NOPTS_VALUE && packet->pts <= st->last_pts) {
-        // LOGD("Fixing PTS non monotonically increasing in stream %d "
-             // "(%" PRIi64 " >= %" PRIi64 ")",
-             // st->index, st->last_pts, packet->pts);
+        LOGD("Fixing PTS non monotonically increasing in stream %d "
+             "(%" PRIi64 " >= %" PRIi64 ")",
+             st->index, st->last_pts, packet->pts);
         packet->pts = ++st->last_pts;
         packet->dts = packet->pts;
     } else {
@@ -126,42 +124,31 @@ static inline bool
 sc_recorder_write_video(struct sc_recorder *recorder, AVPacket *packet) {
     // 录制分段判断Start
     uint64_t pts = packet->pts;
-	uint64_t dts = packet->dts;
+    uint64_t dts = packet->dts;
+    // LOGI("packet->pts -> %01I64u", packet->pts);
+    // LOGI("packet->dts -> %01I64u", packet->dts);
 
     if (recorder->segment_duration_us > 0) {
-        if (pts - recorder->segment_start_pts >= recorder->segment_duration_us && (packet->flags & AV_PKT_FLAG_KEY)) {
-			// sc_mutex_lock(&recorder->mutex);
-            recorder_rotate_file(recorder);
-            recorder->segment_start_pts = pts;
-            recorder->segment_start_dts = dts;
-			AVStream *stream = recorder->ctx->streams[recorder->video_stream.index];
-			
-			LOGI("stream->time_base.num -> %01u", stream->time_base.num);
-			LOGI("stream->time_base.den -> %01u", stream->time_base.den);
-			LOGI("stream->start_time    -> %01I64u", stream->start_time);
-			LOGI("stream->duration      -> %01I64u", stream->duration);
-			// stream->time_base.num = 1;
-			// stream->time_base.den = 1;
-			// stream->start_time = AV_NOPTS_VALUE;
-			// stream->duration = 0;
-            // sc_mutex_unlock(&recorder->mutex);
+        if (pts - recorder->segment_start_pts >= recorder->segment_duration_us){
+            LOGI("packet->pts  -> %01I64u", packet->pts);
+            if (packet->flags & AV_PKT_FLAG_KEY) {
+                LOGI("PKT_FLAG_KEY -> %01I64u", packet->pts);
+                recorder_rotate_file(recorder);
+                recorder->segment_start_pts = pts;
+                recorder->segment_start_dts = dts;
+            }
         }
     }
-	AVPacket pkt;
-	av_packet_ref(&pkt, packet);
-	
-    // if (packet->pts != AV_NOPTS_VALUE) {
-		// pkt.pts = packet->pts - recorder->segment_start_pts; // 分段PTS修正
-	// }
-    // if (packet->dts != AV_NOPTS_VALUE) {
-		// pkt.dts = packet->dts - recorder->segment_start_dts; // 分段DTS修正
-	// }
 
+    if (packet->pts != AV_NOPTS_VALUE) {
+        packet->pts -= recorder->segment_start_pts; // 分段PTS修正
+    }
+    if (packet->dts != AV_NOPTS_VALUE) {
+        packet->dts -= recorder->segment_start_dts; // 分段DTS修正
+    }
     // 录制分段判断End
-	bool ok = sc_recorder_write_stream(recorder, &recorder->video_stream, &pkt);
-	av_packet_unref(&pkt);
-    return ok;
-	
+
+    return sc_recorder_write_stream(recorder, &recorder->video_stream, packet);
 }
 
 static inline bool
@@ -253,64 +240,52 @@ sc_recorder_process_header(struct sc_recorder *recorder) {
         sc_mutex_unlock(&recorder->mutex);
         return false;
     }
-    // LOGI("get video pkt start");
+
     AVPacket *video_pkt = NULL;
- 	if(recorder->video_cfg_pkt){
-		// LOGI("reuse video pkt");
-		video_pkt = recorder->video_cfg_pkt;
-	}else{
-		// LOGI("get video pkt queue");
-		if (!sc_vecdeque_is_empty(&recorder->video_queue)) {
-			assert(recorder->video);
-			video_pkt = sc_vecdeque_pop(&recorder->video_queue);
-		}
-		if (video_pkt) {
-			// av_packet_free(&video_pkt);
-			recorder->video_cfg_pkt = video_pkt;
-		}
-	}
-    // LOGI("get audio pkt start");
+    if(recorder->video_cfg_pkt){
+        video_pkt = recorder->video_cfg_pkt;
+    }else{
+        if (!sc_vecdeque_is_empty(&recorder->video_queue)) {
+            assert(recorder->video);
+            video_pkt = sc_vecdeque_pop(&recorder->video_queue);
+        }
+        if (video_pkt) {
+            recorder->video_cfg_pkt = video_pkt;
+        }
+    }
+
     AVPacket *audio_pkt = NULL;
-	if(recorder->audio_cfg_pkt){
-		// LOGI("reuse audio pkt");
-		audio_pkt = recorder->audio_cfg_pkt;
-	}else{
-		// LOGI("get audio pkt queue");
-		if (recorder->audio_expects_config_packet &&
-				!sc_vecdeque_is_empty(&recorder->audio_queue)) {
-			assert(recorder->audio);
-			audio_pkt = sc_vecdeque_pop(&recorder->audio_queue);
-		}
-		if (audio_pkt) {
-			// av_packet_free(&audio_pkt);
-			recorder->audio_cfg_pkt = audio_pkt;
-		}
-	}
-	// LOGI("get pkt end");
+    if(recorder->audio_cfg_pkt){
+        audio_pkt = recorder->audio_cfg_pkt;
+    }else{
+        if (recorder->audio_expects_config_packet &&
+                !sc_vecdeque_is_empty(&recorder->audio_queue)) {
+            assert(recorder->audio);
+            audio_pkt = sc_vecdeque_pop(&recorder->audio_queue);
+        }
+        if (audio_pkt) {
+            recorder->audio_cfg_pkt = audio_pkt;
+        }
+    }
 
     sc_mutex_unlock(&recorder->mutex);
 
     int ret = false;
-    // LOGI("write video pkt start");
+
     if (video_pkt) {
         if (video_pkt->pts != AV_NOPTS_VALUE) {
             LOGE("The first video packet is not a config packet");
             goto end;
         }
-    // LOGI("assert(recorder->video_stream.index >= 0) start");
-        // LOGI("recorder->video_stream.index -> %01u", recorder->video_stream.index);
 
         assert(recorder->video_stream.index >= 0);
-    // LOGI("assert(recorder->video_stream.index >= 0) end");
         AVStream *video_stream =
             recorder->ctx->streams[recorder->video_stream.index];
-    // LOGI("write video pkt ext start");
         bool ok = sc_recorder_set_extradata(video_stream, video_pkt);
         if (!ok) {
             goto end;
         }
     }
-    // LOGI("write video pkt end");
 
     if (audio_pkt) {
         if (audio_pkt->pts != AV_NOPTS_VALUE) {
@@ -326,9 +301,8 @@ sc_recorder_process_header(struct sc_recorder *recorder) {
             goto end;
         }
     }
-    // LOGI("avformat_write_header(recorder->ctx, NULL) start");
+
     bool ok = avformat_write_header(recorder->ctx, NULL) >= 0;
-    // LOGI("avformat_write_header(recorder->ctx, NULL) end");
     if (!ok) {
         LOGE("Failed to write header to %s", recorder->filename);
         goto end;
@@ -347,57 +321,69 @@ end:
 // 录制分段recorder_rotate_file_Start
 static bool
 recorder_rotate_file(struct sc_recorder *recorder) {
-	if (recorder->ctx){
-		int ret = av_write_trailer(recorder->ctx);
-		if (ret < 0) {
-			LOGE("Failed to write trailer to %s", recorder->filename);
-		}
-		avio_close(recorder->ctx->pb);
-		recorder->ctx->pb = NULL;
-		avformat_free_context(recorder->ctx);
-		recorder->ctx = NULL;
-		recorder->ctx = avformat_alloc_context();
-		if (!recorder->ctx) {
-			LOG_OOM();
-			return false;
-		}
-		sc_mutex_lock(&recorder->mutex);
-		if (recorder->stopped) {
-			sc_mutex_unlock(&recorder->mutex);
-			return false;
-		}
-		if (recorder->video_init){
-			AVStream *stream = avformat_new_stream(recorder->ctx, recorder->video_codec_ctx->codec);
-			if (!stream) {
-				sc_mutex_unlock(&recorder->mutex);
-				return false;
-			}
-			int r = avcodec_parameters_from_context(stream->codecpar, recorder->video_codec_ctx);
-			if (r < 0) {
-				sc_mutex_unlock(&recorder->mutex);
-				return false;
-			}
-			recorder->video_stream.index = stream->index;
-			recorder->video_init = true;
-		}
-		// if (recorder->audio_init){
-			// AVStream *stream = avformat_new_stream(recorder->ctx, ctx->codec);
-			// if (!stream) {
-				// sc_mutex_unlock(&recorder->mutex);
-				// return false;
-			// }
-			// int r = avcodec_parameters_from_context(stream->codecpar, ctx);
-			// if (r < 0) {
-				// sc_mutex_unlock(&recorder->mutex);
-				// return false;
-			// }
-			// recorder->audio_stream.index = stream->index;
-			// recorder->audio_init = true;
-		// }
-		sc_cond_signal(&recorder->cond);
-		sc_mutex_unlock(&recorder->mutex);
-	} 
-	char filename[1024];
+    if (recorder->ctx){
+        sc_mutex_lock(&recorder->mutex);
+        int ret = av_write_trailer(recorder->ctx);
+        if (ret < 0) {
+            LOGE("Failed to write trailer to %s", recorder->filename);
+        }
+        avio_close(recorder->ctx->pb);
+        recorder->ctx->pb = NULL;
+        avformat_free_context(recorder->ctx);
+        recorder->ctx = NULL;
+        recorder->ctx = avformat_alloc_context();
+        if (!recorder->ctx) {
+            sc_mutex_unlock(&recorder->mutex);
+            LOG_OOM();
+            return false;
+        }
+        if (recorder->stopped) {
+            sc_mutex_unlock(&recorder->mutex);
+            return false;
+        }
+        if (recorder->video_init){
+            AVStream *stream = avformat_new_stream(recorder->ctx, recorder->video_codec_ctx->codec);
+            if (!stream) {
+                sc_mutex_unlock(&recorder->mutex);
+                return false;
+            }
+            int r = avcodec_parameters_from_context(stream->codecpar, recorder->video_codec_ctx);
+            if (r < 0) {
+                sc_mutex_unlock(&recorder->mutex);
+                return false;
+            }
+            if (recorder->orientation != SC_ORIENTATION_0) {
+                if (!sc_recorder_set_orientation(stream, recorder->orientation)) {
+                    sc_mutex_unlock(&recorder->mutex);
+                    return false;
+                }
+
+                LOGI("Record orientation set to %s",
+                     sc_orientation_get_name(recorder->orientation));
+            }
+            recorder->video_stream.index = stream->index;
+            recorder->video_stream.last_pts = AV_NOPTS_VALUE;
+            recorder->video_init = true;
+        }
+        // if (recorder->audio_init){
+            // AVStream *stream = avformat_new_stream(recorder->ctx, ctx->codec);
+            // if (!stream) {
+                // sc_mutex_unlock(&recorder->mutex);
+                // return false;
+            // }
+            // int r = avcodec_parameters_from_context(stream->codecpar, ctx);
+            // if (r < 0) {
+                // sc_mutex_unlock(&recorder->mutex);
+                // return false;
+            // }
+            // recorder->audio_stream.index = stream->index;
+            // recorder->audio_stream.last_pts = AV_NOPTS_VALUE;
+            // recorder->audio_init = true;
+        // }
+        sc_cond_signal(&recorder->cond);
+        sc_mutex_unlock(&recorder->mutex);
+    }
+    char filename[1024];
 
     snprintf(
         filename,
@@ -414,7 +400,7 @@ recorder_rotate_file(struct sc_recorder *recorder) {
     if (!ok) {
         return false;
     }
-	// LOGI("sc_recorder_process_header(recorder)");
+    // LOGI("sc_recorder_process_header(recorder)");
     bool header_written = sc_recorder_process_header(recorder);
     if (!header_written) {
         return false;
@@ -598,7 +584,7 @@ end:
 static bool
 sc_recorder_record(struct sc_recorder *recorder) {
     // bool ok = sc_recorder_open_output_file(recorder);
-	bool ok = recorder_rotate_file(recorder);
+    bool ok = recorder_rotate_file(recorder);
     if (!ok) {
         return false;
     }
@@ -713,7 +699,7 @@ sc_recorder_video_packet_sink_open(struct sc_packet_sink *sink,
         LOGI("Record orientation set to %s",
              sc_orientation_get_name(recorder->orientation));
     }
-	recorder->video_codec_ctx = ctx;
+    recorder->video_codec_ctx = ctx;
     recorder->video_init = true;
     sc_cond_signal(&recorder->cond);
     sc_mutex_unlock(&recorder->mutex);
@@ -799,7 +785,7 @@ sc_recorder_audio_packet_sink_open(struct sc_packet_sink *sink,
     recorder->audio_expects_config_packet =
         ctx->codec_id != AV_CODEC_ID_PCM_S16LE;
 
-	recorder->audio_codec_ctx = ctx;
+    recorder->audio_codec_ctx = ctx;
     recorder->audio_init = true;
     sc_cond_signal(&recorder->cond);
     sc_mutex_unlock(&recorder->mutex);
