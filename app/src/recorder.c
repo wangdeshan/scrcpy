@@ -129,13 +129,19 @@ sc_recorder_write_video(struct sc_recorder *recorder, AVPacket *packet) {
     // LOGI("packet->dts -> %01I64u", packet->dts);
 
     if (recorder->segment_duration_us > 0) {
-        if (pts - recorder->segment_start_pts >= recorder->segment_duration_us){
-            LOGI("packet->pts  -> %01I64u", packet->pts);
+        uint64_t curr_duration = pts - recorder->segment_start_pts;
+        if (curr_duration + recorder->segment_duration_us_diff >= recorder->segment_duration_us){
+            // LOGI("packet->pts  -> %01I64u", packet->pts);
             if (packet->flags & AV_PKT_FLAG_KEY) {
-                LOGI("PKT_FLAG_KEY -> %01I64u", packet->pts);
+                int64_t diff = curr_duration - recorder->segment_duration_us;
+                recorder->segment_duration_us_diff += diff;
+                LOGI("PKT_FLAG_KEY -> %01.7f", packet->pts / 1e6);
+                LOGI("SEG_DURATION -> %09.6f", curr_duration / 1e6);
+                LOGI("DURATION_DIFF -> %09.6f", recorder->segment_duration_us_diff/ 1e6);
                 recorder_rotate_file(recorder);
                 recorder->segment_start_pts = pts;
                 recorder->segment_start_dts = dts;
+
             }
         }
     }

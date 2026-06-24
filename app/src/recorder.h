@@ -64,14 +64,15 @@ struct sc_recorder {
 
     // 录制分段Start
     uint64_t segment_duration_us;
+    uint64_t segment_duration_us_diff;
     uint64_t segment_start_pts;
     uint64_t segment_start_dts;
     unsigned segment_index;
-	bool av_cfgpkt_init;
-	AVPacket *video_cfg_pkt;
-	AVPacket *audio_cfg_pkt;
-	AVCodecContext *video_codec_ctx;
-	AVCodecContext *audio_codec_ctx;
+    bool av_cfgpkt_init;
+    AVPacket *video_cfg_pkt;
+    AVPacket *audio_cfg_pkt;
+    AVCodecContext *video_codec_ctx;
+    AVCodecContext *audio_codec_ctx;
     // 录制分段End
 };
 

@@ -55,7 +55,6 @@ public class SurfaceEncoder implements AsyncProcessor {
 
     private final CaptureReset reset = new CaptureReset();
 
-    long Time = System.currentTimeMillis();
 
     public SurfaceEncoder(SurfaceCapture capture, Streamer streamer, Options options) {
         this.capture = capture;
@@ -202,6 +201,8 @@ public class SurfaceEncoder implements AsyncProcessor {
     private void encode(MediaCodec codec, Streamer streamer) throws IOException {
         MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
 
+        long Time = System.currentTimeMillis();
+
         boolean eos;
         do {
             int outputBufferId = codec.dequeueOutputBuffer(bufferInfo, -1);
@@ -214,9 +215,9 @@ public class SurfaceEncoder implements AsyncProcessor {
                         MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME,
                         0
                     );
-                    // Ln.i("REQ_keyframe ST -> " + String.valueOf(Time));
+                    // Ln.i("REQ_keyframeTS -> " + String.valueOf(curTime));
                     codec.setParameters(params);
-                    Time = curTime;
+                    Time += 5000;
                 }
                 eos = (bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0;
                 // On EOS, there might be data or not, depending on bufferInfo.size

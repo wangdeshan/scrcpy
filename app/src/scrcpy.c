@@ -615,8 +615,9 @@ scrcpy(struct scrcpy_options *options) {
                               &recorder_cbs, NULL)) {
             goto end;
         }
-		
-		s->recorder.segment_duration_us = (uint64_t)options->record_segment_time * 1000000;
+
+        s->recorder.segment_duration_us = (uint64_t)options->record_segment_time * 1000000;
+        s->recorder.segment_duration_us_diff = 0;
 
         recorder_initialized = true;
 
